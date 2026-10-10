@@ -74,11 +74,33 @@ cmake --build build -j && ctest --test-dir build --output-on-failure
 This also produces a portable `renderer` and `s1test` that run against a mock
 transport, useful for developing the protocol without hardware.
 
-## Quick start (Windows)
+## Quick start (Windows) — plug and play
 
-Full instructions are in [`docs/build.md`](docs/build.md),
+On Windows, one command bootstraps the toolchains, verifies the build method and
+builds everything:
+
+```cmd
+build-windows.bat
+```
+
+It runs `scripts\windows\bootstrap.ps1` (installs CMake + VS Build Tools via
+winget, needs no manual setup), `scripts\windows\test_build.ps1` (**verifies the
+method works** — configure, build, CTest, renderer self-test, `s1test` mock run),
+then `scripts\windows\build.ps1` (driver if the WDK is present, control app if
+the .NET SDK is present). Outputs land in `dist\windows\`. Modes:
+`deps`, `test`, `build`, `startup`.
+
+Enable autostart (a per-user scheduled task that starts the renderer at logon
+and restarts it on failure, plus the control app's Run key):
+
+```cmd
+build-windows.bat startup
+```
+
+Then set the *ACEMAGIC S1 Front LCD* to **Extend** in Display Settings. Full
+instructions are in [`docs/build.md`](docs/build.md),
 [`docs/installation.md`](docs/installation.md) and
-[`docs/troubleshooting.md`](docs/troubleshooting.md). In short:
+[`docs/troubleshooting.md`](docs/troubleshooting.md). Manual equivalents:
 
 ```cmd
 :: build (VS 2022 + WDK 10)

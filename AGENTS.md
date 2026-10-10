@@ -14,12 +14,19 @@ renderer -> HID.
 - Portable core (any host): `scripts/run_host_tests.sh` (CMake).
   CMake may be at `~/.local/bin/cmake` (pip).
   Expect `100% tests passed, 0 failed out of 5`.
+- Windows plug-and-play: `build-windows.bat` (bootstrap -> verify -> build).
+  - Verify only: `build-windows.bat test` -> `scripts/windows/test_build.ps1`
+  - Autostart: `build-windows.bat startup` -> `scripts/windows/install-startup.ps1`
+  - PowerShell scripts can be syntax-checked with an AST parse; on this host
+    PowerShell 7 lives at `~/pwsh/pwsh` (run with
+    `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1`).
 - Portable binaries: `build/renderer`, `build/s1test`.
   - `build/renderer --selftest --fps 10 --frames 5`
   - `build/s1test --mock pattern testsrc`
   - `build/s1test --mock --dump reports.bin region` (4105 bytes/report)
 - Windows-only (NOT built in the Linux dev env): driver (VS2022+WDK10),
-  control app (.NET 8 SDK). See `docs/build.md`.
+  control app (.NET 8 SDK). CMake links the real HID transport only under
+  `WIN32`; elsewhere it uses the mock. See `docs/build.md`.
 
 ## Conventions
 

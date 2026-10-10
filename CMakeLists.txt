@@ -50,20 +50,32 @@ s1_add_test(test_s1_device      usb/tests/test_s1_device.cpp)
 s1_add_test(test_frame_pipeline renderer/tests/test_frame_pipeline.cpp)
 
 # --- Portable executables --------------------------------------------------
-# The renderer and test utility build in portable (mock-transport) mode here;
-# on Windows they link the real HID transport instead. This is enough to run the
-# end-to-end self-test and generate protocol captures.
+# On Windows the executables link the real HID transport; elsewhere they build
+# in portable (mock-transport) mode. Both run the end-to-end self-test.
+set(S1_PLATFORM_SOURCES usb/src/s1_transport_platform_none.cpp)
+
+if(WIN32)
+  # Real setupapi/HID transport, plus the shared-memory IPC helpers.
+  set(S1_PLATFORM_SOURCES
+    usb/src/s1_transport_win.cpp
+    shared/src/s1_ipc_win.cpp
+  )
+  set(S1_PLATFORM_LIBS setupapi hid)
+else()
+  set(S1_PLATFORM_LIBS "")
+endif()
+
 add_executable(s1test
   usb/src/s1test.cpp
-  usb/src/s1_transport_platform_none.cpp
+  ${S1_PLATFORM_SOURCES}
 )
-target_link_libraries(s1test PRIVATE s1_core)
+target_link_libraries(s1test PRIVATE s1_core ${S1_PLATFORM_LIBS})
 
 add_executable(renderer
   renderer/src/renderer_main.cpp
-  usb/src/s1_transport_platform_none.cpp
+  ${S1_PLATFORM_SOURCES}
 )
-target_link_libraries(renderer PRIVATE s1_core)
+target_link_libraries(renderer PRIVATE s1_core ${S1_PLATFORM_LIBS})
 
 # --- Integration test: renderer self-test emits valid captures -------------
 # Runs the renderer briefly with the mock transport and checks that it produced

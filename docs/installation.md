@@ -59,7 +59,17 @@ Run `AcemagicS1Control.exe`. It starts the renderer automatically. Move any
 window onto the S1 display and its content should appear on the physical LCD.
 
 To start automatically with Windows, tick **Start with Windows** in the control
-app (per-user, `HKCU\...\Run`).
+app (per-user, `HKCU\...\Run`), or run the helper, which additionally schedules
+the renderer to start at logon and restart on failure:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\windows\install-startup.ps1
+# remove:
+powershell -ExecutionPolicy Bypass -File scripts\windows\uninstall-startup.ps1
+```
+
+The renderer is scheduled as a task in the interactive session (not a service),
+because it must open the HID device as the logged-in user.
 
 ## 3. Silent installation
 

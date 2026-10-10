@@ -15,6 +15,45 @@ There are two build environments:
 The portable core is deliberately OS-independent so it can be unit-tested
 wherever a compiler exists; the Windows-only code is the thin layer on top.
 
+## 0. Plug-and-play (Windows): one command
+
+On Windows the fastest path needs no manual setup:
+
+```cmd
+git clone <repo> && cd acemagic-s1-display
+build-windows.bat
+```
+
+`build-windows.bat` runs, in order:
+
+1. `scripts\windows\bootstrap.ps1` — installs or refreshes dependencies (CMake,
+   Visual Studio 2022 Build Tools + C++, optional Windows SDK/WDK and .NET SDK)
+   using `winget`, with a portable-CMake fallback;
+2. `scripts\windows\test_build.ps1` — **verifies the build method works** on the
+   machine (toolchain detection, CMake configure/build, full CTest suite, renderer
+   self-test, `s1test` mock run) and stops if anything fails;
+3. `scripts\windows\build.ps1` — builds every component the machine supports
+   (portable core + `renderer` + `s1test`, the driver if the WDK is present, the
+   control app if the .NET SDK is present) into `dist\windows\`.
+
+Modes: `build-windows.bat deps|test|build|startup`.
+
+For the autostart pieces:
+
+```cmd
+build-windows.bat startup      REM schedules the renderer at logon + Run key
+```
+
+The scripts are plain PowerShell, so every step also runs on its own:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\windows\test_build.ps1
+powershell -ExecutionPolicy Bypass -File scripts\windows\build.ps1 -Configuration Release -TestSign
+powershell -ExecutionPolicy Bypass -File scripts\windows\install-startup.ps1
+```
+
+`test_build.ps1` is the "does the method work?" check and needs no hardware.
+
 ## 1. Portable core (Linux / macOS / Windows, CMake)
 
 Requirements: CMake ≥ 3.15 and a C++17 compiler (GCC 11+, Clang 12+, MSVC 2019+).
