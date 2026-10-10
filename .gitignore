@@ -1,0 +1,33 @@
+# Build outputs
+build/
+out/
+bin/
+obj/
+*.o
+*.obj
+*.dll
+*.exe
+*.lib
+*.pdb
+*.sys
+*.cat
+*.inf.bak
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+
+# .NET
+[Bb]in/
+[Oo]bj/
+*.nupkg
+
+# Logs and runtime artifacts
+*.log
+*.log.1
+.vsconfig
