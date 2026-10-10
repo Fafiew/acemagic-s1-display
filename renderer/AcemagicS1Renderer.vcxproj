@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AcemagicS1Renderer.vcxproj - the user-session renderer.
+
+  Reads desktop frames from the driver's shared memory and drives the LCD over
+  HID. Build with Visual Studio 2022 + Windows SDK, or via CMake (see
+  docs/build.md). Produces AcemagicS1Renderer.exe, which the control app
+  launches.
+-->
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration><Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration><Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{9B1C2D3E-4F50-4A61-B728-C9D0E1F2A3B4}</ProjectGuid>
+    <RootNamespace>AcemagicS1Renderer</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <!-- CMake can build the same sources on non-Windows hosts. -->
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <WarningLevel>Level4</WarningLevel>
+      <AdditionalIncludeDirectories>..\..\shared\include;..\..\usb\include;..\..\renderer\include;..\..\renderer\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x0A00;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>setupapi.lib;hid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\shared\src\s1_protocol.cpp" />
+    <ClCompile Include="..\..\shared\src\s1_log.cpp" />
+    <ClCompile Include="..\..\shared\src\s1_ipc_win.cpp" />
+    <ClCompile Include="..\..\usb\src\s1_device.cpp" />
+    <ClCompile Include="..\..\usb\src\s1_transport_mock.cpp" />
+    <ClCompile Include="..\..\usb\src\s1_transport_win.cpp" />
+    <ClCompile Include="..\..\renderer\src\frame_pipeline.cpp" />
+    <ClCompile Include="..\..\renderer\src\shm_frame_source.cpp" />
+    <ClCompile Include="..\..\renderer\src\renderer_main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\shared\include\s1_protocol.h" />
+    <ClInclude Include="..\..\shared\include\s1_ipc.h" />
+    <ClInclude Include="..\..\shared\include\s1_ipc_win.h" />
+    <ClInclude Include="..\..\usb\include\s1_transport.h" />
+    <ClInclude Include="..\..\usb\include\s1_device.h" />
+    <ClInclude Include="..\..\renderer\include\frame_pipeline.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

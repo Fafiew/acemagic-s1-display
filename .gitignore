@@ -12,7 +12,6 @@ obj/
 *.sys
 *.cat
 *.inf.bak
-
 # Visual Studio
 .vs/
 *.user
