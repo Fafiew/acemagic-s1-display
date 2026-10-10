@@ -48,3 +48,26 @@ s1_add_test(test_protocol       shared/tests/test_protocol.cpp)
 s1_add_test(test_ipc_layout     shared/tests/test_ipc_layout.cpp)
 s1_add_test(test_s1_device      usb/tests/test_s1_device.cpp)
 s1_add_test(test_frame_pipeline renderer/tests/test_frame_pipeline.cpp)
+
+# --- Portable executables --------------------------------------------------
+# The renderer and test utility build in portable (mock-transport) mode here;
+# on Windows they link the real HID transport instead. This is enough to run the
+# end-to-end self-test and generate protocol captures.
+add_executable(s1test
+  usb/src/s1test.cpp
+  usb/src/s1_transport_platform_none.cpp
+)
+target_link_libraries(s1test PRIVATE s1_core)
+
+add_executable(renderer
+  renderer/src/renderer_main.cpp
+  usb/src/s1_transport_platform_none.cpp
+)
+target_link_libraries(renderer PRIVATE s1_core)
+
+# --- Integration test: renderer self-test emits valid captures -------------
+# Runs the renderer briefly with the mock transport and checks that it produced
+# full 4105-byte frames, exercising the whole pipeline without hardware.
+add_test(NAME renderer_selftest
+         COMMAND renderer --selftest --fps 10 --frames 5)
+set_tests_properties(renderer_selftest PROPERTIES TIMEOUT 30)

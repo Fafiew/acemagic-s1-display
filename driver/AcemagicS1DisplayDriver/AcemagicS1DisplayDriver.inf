@@ -1,0 +1,72 @@
+;
+; AcemagicS1DisplayDriver.inf
+;
+; Installs the IddCx indirect display driver that exposes the ACEMAGIC S1 front
+; LCD as an extended Windows display. The device is a software (root-enumerated)
+; device; there is no physical PnP device for the virtual monitor.
+;
+; Targeted at Windows 10 1903+ / Windows 11 (IddCx 1.4+). See docs/installation.md.
+;
+
+[Version]
+Signature="$Windows NT$"
+Class=Display
+ClassGuid={4D36E968-E325-11CE-BFC1-08002BE10318}
+Provider=%ProviderName%
+CatalogFile=AcemagicS1DisplayDriver.cat
+DriverVer=01/01/2026,1.0.0.0
+PnpLockDown=1
+
+[Manufacturer]
+%ProviderName%=AcemagicS1,NT$ARCH$.10.0...18362
+
+[AcemagicS1.NT$ARCH$.10.0...18362]
+%DeviceName%=AcemagicS1_Install, Root\AcemagicS1Display
+
+[SourceDisksNames]
+1=%DiskName%
+
+[SourceDisksFiles]
+AcemagicS1DisplayDriver.dll=1
+
+[DestinationDirs]
+UMDriverCopy=12,UMDF
+
+[UMDriverCopy]
+AcemagicS1DisplayDriver.dll
+
+; =================== UMDF Device ==================================
+[AcemagicS1_Install.NT]
+Include=WUDFRD.inf
+Needs=WUDFRD.NT
+CopyFiles=UMDriverCopy
+
+[AcemagicS1_Install.NT.hw]
+Include=WUDFRD.inf
+Needs=WUDFRD.NT.HW
+AddReg=AcemagicS1_HardwareSettings
+
+[AcemagicS1_HardwareSettings]
+HKR,, "UpperFilters", %REG_MULTI_SZ%, "IndirectKmd"
+HKR, "WUDF", "DeviceGroupId", %REG_SZ%, "AcemagicS1DisplayDriverGroup"
+
+[AcemagicS1_Install.NT.Services]
+Include=WUDFRD.inf
+Needs=WUDFRD.NT.Services
+
+[AcemagicS1_Install.NT.Wdf]
+UmdfService=AcemagicS1DisplayDriver,AcemagicS1DisplayDriver_Install
+UmdfServiceOrder=AcemagicS1DisplayDriver
+UmdfKernelModeClientPolicy=AllowKernelModeClients
+
+[AcemagicS1DisplayDriver_Install]
+UmdfLibraryVersion=$UMDFVERSION$
+ServiceBinary=%12%\UMDF\AcemagicS1DisplayDriver.dll
+UmdfExtensions=IddCx0104
+
+[Strings]
+ProviderName="Fafiew"
+DiskName="AcemagicS1DisplayDriver Installation Disk"
+DeviceName="ACEMAGIC S1 Front LCD (Virtual Display)"
+REG_MULTI_SZ=0x00010000
+REG_SZ=0x00000000
