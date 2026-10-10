@@ -1,0 +1,16 @@
+<Application x:Class="AcemagicS1Control.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <!-- Minimal modern-ish palette; no external theme dependencies. -->
+        <SolidColorBrush x:Key="BgBrush" Color="#1E1E22"/>
+        <SolidColorBrush x:Key="PanelBrush" Color="#2A2A30"/>
+        <SolidColorBrush x:Key="FgBrush" Color="#F2F2F2"/>
+        <SolidColorBrush x:Key="MutedBrush" Color="#9A9AA5"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#4FA3FF"/>
+        <SolidColorBrush x:Key="OkBrush" Color="#4CD07A"/>
+        <SolidColorBrush x:Key="WarnBrush" Color="#FFB020"/>
+        <SolidColorBrush x:Key="ErrBrush" Color="#FF5C5C"/>
+    </Application.Resources>
+</Application>
