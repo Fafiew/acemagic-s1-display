@@ -80,6 +80,15 @@ function Find-WindowsSdk {
     return [pscustomobject]@{ Present = $false; Root = $null; Include = $null; Version = $null }
 }
 
+# Convert a Windows path to a form CMake can store in its generated cache files.
+# CMake writes the compiler path verbatim into CMakeRCCompiler.cmake, where
+# backslashes are parsed as escapes ("Invalid character escape '\P'"), so use
+# forward slashes and collapse any doubled separators.
+function ConvertTo-CMakePath([string] $Path) {
+    if (-not $Path) { return $Path }
+    return ($Path -replace '\\+', '/') -replace '/+', '/'
+}
+
 # Find a real rc.exe (resource compiler). CMake reads the RC environment
 # variable *before* searching the PATH, so if RC is set to anything invalid the
 # configure step dies with "Could not find compiler set in environment variable
@@ -88,11 +97,11 @@ function Resolve-RcCompiler {
     if ($env:RC) {
         if ((Test-Path -LiteralPath $env:RC -ErrorAction SilentlyContinue) -or
             (Get-Command $env:RC -ErrorAction SilentlyContinue)) {
-            return $env:RC
+            return (ConvertTo-CMakePath $env:RC)
         }
     }
     $cmd = Get-Command 'rc.exe' -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
+    if ($cmd) { return (ConvertTo-CMakePath $cmd.Source) }
     $sdk = Find-WindowsSdk
     if ($sdk.Present) {
         $binRoot = Join-Path $sdk.Root 'Windows Kits\10\bin'
@@ -102,7 +111,7 @@ function Resolve-RcCompiler {
             foreach ($d in $dirs) {
                 foreach ($arch in @('x64', 'x86')) {
                     $p = Join-Path $d.FullName "$arch\rc.exe"
-                    if (Test-Path -LiteralPath $p) { return $p }
+                    if (Test-Path -LiteralPath $p) { return (ConvertTo-CMakePath $p) }
                 }
             }
         }

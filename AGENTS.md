@@ -75,12 +75,17 @@ renderer -> HID.
 - Prefer `Invoke-Native -File 'ctest'` over bare `ctest`, so CMake's ctest is
   found even when it is not on PATH.
 - **Clear a polluted `RC` (and `CC`/`CXX`/`LD`) before configuring CMake.**
-  Importing the VS dev shell can leave `RC` set to PowerShell error-record text
-  (`System.Management.Automation.RemoteException`), and CMake reads `RC` before
-  searching the PATH, so configure dies with "Could not find compiler set in
-  environment variable RC". `Initialize-RcCompilerEnv` drops values that are not
-  an existing file or a PATH-resolvable name and points `RC` at a real `rc.exe`
-  (PATH, then the Windows Kits bin). We also pass `-DCMAKE_RC_COMPILER`.
+  Importing the VS dev shell can leave `RC` set to junk (seen in the wild:
+  literally `0`, and `System.Management.Automation.RemoteException`). CMake reads
+  `RC` before searching the PATH, so configure dies with "Could not find compiler
+  set in environment variable RC". `Initialize-RcCompilerEnv` drops values that
+  are not an existing file or a PATH-resolvable name and points `RC` at a real
+  `rc.exe` (PATH, then the Windows Kits bin). We also pass `-DCMAKE_RC_COMPILER`.
+- **Hand CMake forward-slash paths.** CMake writes the compiler path verbatim into
+  its generated `CMakeRCCompiler.cmake`, where backslashes are parsed as escapes
+  ("Invalid character escape '\P'"). `ConvertTo-CMakePath` collapses doubled
+  separators (a `Join-Path` trailing-separator artifact produced `...\10.0.19041.0\\x64\rc.exe`)
+  and converts `\` to `/`; use it for anything passed to CMake.
 
 ## Status
 

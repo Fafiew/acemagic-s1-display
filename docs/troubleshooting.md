@@ -15,6 +15,16 @@ diagnostics** button and from the renderer log.
   `cmake` invocation, delete the variable first:
   `Remove-Item Env:RC` (PowerShell) or `set RC=` (cmd), then re-run.
 
+## CMake says "Invalid character escape" while configuring
+
+- **A backslash path passed to CMake.** CMake writes the compiler path verbatim
+  into its generated `CMakeRCCompiler.cmake`, where `\` is parsed as an escape,
+  so `C:\Program Files (x86)\...\rc.exe` fails with `Invalid character escape
+  '\P'`.
+- **Fix.** The scripts now normalize the `RC` path to forward slashes
+  (`C:/Program Files (x86)/.../rc.exe`) before configuring. If you set
+  `CMAKE_RC_COMPILER` or `RC` by hand, use forward slashes.
+
 ## First: collect a log to send back
 
 Every `build-windows.bat` run writes a full transcript to `logs\log.txt`. To
