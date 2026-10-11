@@ -58,6 +58,23 @@ renderer -> HID.
   set `commit.gpgsign=true` with `gpg.program` pointing at a loopback wrapper.
 - Remote: `github.com/Fafiew/acemagic-s1-display`. Work on branches; PR to main.
 
+## Windows PowerShell pitfalls (learned from real bug reports)
+
+- **Never call a native tool with `$ErrorActionPreference='Stop'`.** On Windows
+  PowerShell 5.1 a native command's stderr becomes a *terminating* error, so
+  `git`/`bcdedit`/`vswhere` in a folder or state that writes to stderr aborts
+  the whole script. This actually killed `test_build.ps1` when run from an
+  extracted (non-git) tarball. Route every native call through
+  `Invoke-Native` (in `logging.ps1`), which forces a local `Continue`, merges
+  streams and returns `Output`/`ExitCode`.
+- **`Join-Path` throws on a null base.** `$env:ProgramFiles(x86)` is undefined on
+  32-bit or unusual installs, and `Join-Path ${env:ProgramFiles(x86)} ...` then
+  fails with "Cannot bind argument to parameter 'Path' because it is null".
+  Always guard with `if ($base) { ... }`. Use `Find-WindowsSdk` for the SDK.
+- **Only probe `git` when `$Root/.git` exists**; tarball checkouts have no repo.
+- Prefer `Invoke-Native -File 'ctest'` over bare `ctest`, so CMake's ctest is
+  found even when it is not on PATH.
+
 ## Status
 
 Done: protocol, IPC, device engine, pipeline (+30 tests), Windows HID transport,

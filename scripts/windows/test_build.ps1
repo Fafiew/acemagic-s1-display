@@ -70,8 +70,12 @@ try {
         )
         foreach ($c in $candidates) { if (Test-Path $c) { $cmake = $c; break } }
     }
-    if ($cmake) { Write-Ok "cmake: $(& $cmake --version | Select-Object -First 1)" }
-    else        { Write-Fail 'cmake not found (winget install Kitware.CMake, or pip install cmake)' }
+    if ($cmake) {
+        $cv = Invoke-Native -File $cmake -Arguments @('--version')
+        Write-Ok "cmake: $(($cv.Output | Select-Object -First 1))"
+    } else {
+        Write-Fail 'cmake not found (winget install Kitware.CMake, or pip install cmake)'
+    }
 
     $hasCl = Test-Command 'cl'
     $hasGcc = Test-Command 'g++'
@@ -81,30 +85,32 @@ try {
 
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
     if (Test-Path $vswhere) {
-        $vs = & $vswhere -latest -property displayName 2>$null
-        Write-Ok "Visual Studio: $vs"
+        $vs = Invoke-Native -File $vswhere -Arguments @('-latest', '-property', 'displayName')
+        Write-Ok "Visual Studio: $(($vs.Output | Select-Object -First 1))"
     } else {
         Write-Warn2 'vswhere.exe not found (Visual Studio needed only for the driver)'
     }
 
-    $kits = "${env:ProgramFiles(x86)}\Windows Kits\10\Include"
-    if (Test-Path $kits) {
-        $sdk = Get-ChildItem $kits -Directory -ErrorAction SilentlyContinue |
-            Select-Object -Last 1 -ExpandProperty Name
-        Write-Ok "Windows SDK: $sdk"
-    } else {
-        Write-Warn2 'Windows SDK not found (needed only for the driver)'
-    }
+    $sdk = Find-WindowsSdk
+    if ($sdk.Present) { Write-Ok "Windows SDK: $($sdk.Version)" }
+    else { Write-Warn2 'Windows SDK not found (needed only for the driver)' }
 
     if (-not $SkipDotNet) {
-        if (Test-Command 'dotnet') { Write-Ok "dotnet: $(& dotnet --version)" }
-        else { Write-Warn2 'dotnet SDK not found (needed only for the control app)' }
+        if (Test-Command 'dotnet') {
+            $dv = Invoke-Native -File 'dotnet' -Arguments @('--version')
+            Write-Ok "dotnet: $(($dv.Output | Select-Object -First 1))"
+        } else {
+            Write-Warn2 'dotnet SDK not found (needed only for the control app)'
+        }
     }
 
     # -----------------------------------------------------------------------
     function Import-VsDevEnvironment {
         if (-not (Test-Path $vswhere)) { return $false }
-        $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>$null
+        $r = Invoke-Native -File $vswhere -Arguments @('-latest', '-products', '*',
+                '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+                '-property', 'installationPath')
+        $vsPath = ($r.Output | Select-Object -First 1)
         if (-not $vsPath) { return $false }
         $devShell = Join-Path $vsPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll'
         if (-not (Test-Path $devShell)) { return $false }
@@ -134,20 +140,23 @@ try {
         $cfgArgs = @('-S', $script:Root, '-B', $buildDir, '-DCMAKE_BUILD_TYPE=RelWithDebInfo')
         if (Test-Command 'cl') { $cfgArgs += @('-G', 'Visual Studio 17 2022', '-A', 'x64') }
 
-        & $cmake @cfgArgs 2>&1 | ForEach-Object { Write-Host "    $_" }
-        if ($LASTEXITCODE -ne 0) {
-            Write-Fail "cmake configure failed ($LASTEXITCODE)"
+        $cfg = Invoke-Native -File $cmake -Arguments $cfgArgs
+        $cfg.Output | ForEach-Object { Write-Host "    $_" }
+        if ($cfg.ExitCode -ne 0) {
+            Write-Fail "cmake configure failed ($($cfg.ExitCode))"
         } else {
             Write-Ok 'configure succeeded'
 
             Write-Step 'Build'
-            & $cmake --build $buildDir -j 2>&1 | ForEach-Object { Write-Host "    $_" }
-            if ($LASTEXITCODE -ne 0) { Write-Fail "build failed ($LASTEXITCODE)" }
+            $bld = Invoke-Native -File $cmake -Arguments (@('--build', $buildDir, '--config', 'RelWithDebInfo', '-j'))
+            $bld.Output | ForEach-Object { Write-Host "    $_" }
+            if ($bld.ExitCode -ne 0) { Write-Fail "build failed ($($bld.ExitCode))" }
             else { Write-Ok 'build succeeded' }
 
             Write-Step 'CTest'
-            & ctest --test-dir $buildDir --output-on-failure 2>&1 | ForEach-Object { Write-Host "    $_" }
-            if ($LASTEXITCODE -ne 0) { Write-Fail "ctest failed ($LASTEXITCODE)" }
+            $ct = Invoke-Native -File 'ctest' -Arguments @('--test-dir', $buildDir, '-C', 'RelWithDebInfo', '--output-on-failure')
+            $ct.Output | ForEach-Object { Write-Host "    $_" }
+            if ($ct.ExitCode -ne 0) { Write-Fail "ctest failed ($($ct.ExitCode))" }
             else { Write-Ok 'all tests passed' }
 
             $exeDir = $buildDir
@@ -162,15 +171,17 @@ try {
 
             Write-Step 'Renderer self-test (no hardware)'
             if (Test-Path $renderer) {
-                & $renderer --selftest --fps 10 --frames 5 2>&1 | ForEach-Object { Write-Host "    $_" }
-                if ($LASTEXITCODE -ne 0) { Write-Fail "renderer self-test failed ($LASTEXITCODE)" }
+                $rs = Invoke-Native -File $renderer -Arguments @('--selftest', '--fps', '10', '--frames', '5')
+                $rs.Output | ForEach-Object { Write-Host "    $_" }
+                if ($rs.ExitCode -ne 0) { Write-Fail "renderer self-test failed ($($rs.ExitCode))" }
                 else { Write-Ok 'renderer self-test passed' }
             } else { Write-Fail "renderer executable not found under $exeDir" }
 
             Write-Step 's1test mock run (no hardware)'
             if (Test-Path $s1test) {
-                & $s1test --mock pattern testsrc 2>&1 | ForEach-Object { Write-Host "    $_" }
-                if ($LASTEXITCODE -ne 0) { Write-Fail "s1test mock run failed ($LASTEXITCODE)" }
+                $st = Invoke-Native -File $s1test -Arguments @('--mock', 'pattern', 'testsrc')
+                $st.Output | ForEach-Object { Write-Host "    $_" }
+                if ($st.ExitCode -ne 0) { Write-Fail "s1test mock run failed ($($st.ExitCode))" }
                 else { Write-Ok 's1test mock run passed' }
             } else { Write-Fail "s1test executable not found under $exeDir" }
         }
@@ -188,6 +199,11 @@ try {
         $script:Failures | ForEach-Object { Write-Host "    - $_" -ForegroundColor Red }
         $code = 1
     }
+} catch {
+    Write-Log "UNEXPECTED ERROR: $($_.Exception.Message)" 'ERROR'
+    Write-Host "UNEXPECTED ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
+    $code = 1
 } finally {
     Write-Log "log written to $LogPath"
     Stop-Log

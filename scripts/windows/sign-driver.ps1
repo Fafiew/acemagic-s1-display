@@ -86,13 +86,13 @@ foreach ($store in @('Root', 'TrustedPublisher')) {
 }
 
 Write-Host '==> Enabling test-signing' -ForegroundColor Cyan
-& bcdedit /set testsigning on | Out-Null
+Invoke-Native -File 'bcdedit' -Arguments @('/set', 'testsigning', 'on') | Out-Null
 Write-Host '    test-signing enabled (reboot required before the driver will load)'
 
 Write-Host '==> Generating catalog' -ForegroundColor Cyan
 $inf = Get-ChildItem $DriverDir -Filter '*.inf' -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($inf -and $inf2cat) {
-    & $inf2cat /driver:$DriverDir /os:10_X64
+    Invoke-Native -File $inf2cat -Arguments @("/driver:$DriverDir", '/os:10_X64') | Out-Null
 } elseif (-not $inf2cat) {
     Write-Warning 'inf2cat.exe not found; skipping catalog generation'
 }
@@ -101,8 +101,9 @@ Write-Host '==> Signing binaries' -ForegroundColor Cyan
 $files = Get-ChildItem $DriverDir -Include '*.sys', '*.dll', '*.cat' -File -ErrorAction SilentlyContinue
 if (-not $files) { $files = Get-ChildItem $DriverDir -File | Where-Object { $_.Extension -in '.sys', '.dll', '.cat' } }
 foreach ($f in $files) {
-    & $signtool sign /fd sha256 /sha1 $cert.Thumbprint /tr http://timestamp.digicert.com /td sha256 $f.FullName
-    if ($LASTEXITCODE -eq 0) { Write-Host "    signed $($f.Name)" } else { Write-Warning "failed to sign $($f.Name)" }
+    $sg = Invoke-Native -File $signtool -Arguments @('sign', '/fd', 'sha256', '/sha1', $cert.Thumbprint,
+            '/tr', 'http://timestamp.digicert.com', '/td', 'sha256', $f.FullName)
+    if ($sg.ExitCode -eq 0) { Write-Host "    signed $($f.Name)" } else { Write-Warning "failed to sign $($f.Name)" }
 }
 
 Write-Host ''

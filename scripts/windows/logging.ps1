@@ -38,6 +38,48 @@ function Write-Log {
     Write-Host "[$ts][$Level] $Message"
 }
 
+# Run a native command and capture its output without ever letting it throw.
+#
+# Windows PowerShell 5.1 turns a native command's stderr into a *terminating*
+# error when $ErrorActionPreference is 'Stop', which aborts the script (this is
+# what happened when git was run in a folder that is not a repository). This
+# helper forces a local 'Continue', merges the streams and keeps the exit code.
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory = $true)] [string] $File,
+        [Parameter(ValueFromRemainingArguments = $true)] [object[]] $Arguments
+    )
+    $out = @()
+    $code = 0
+    $prev = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $out = @(& $File @Arguments 2>&1 | ForEach-Object { "$_" })
+        $code = $LASTEXITCODE
+    } catch {
+        $out = @("$($_.Exception.Message)")
+        $code = -1
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+    [pscustomobject]@{ Output = $out; ExitCode = $code }
+}
+
+# Locate the Windows SDK/WDK. The SDK lives under ProgramFiles(x86) on 64-bit
+# Windows, but fall back to ProgramFiles so the check is correct everywhere.
+function Find-WindowsSdk {
+    foreach ($base in @(${env:ProgramFiles(x86)}, $env:ProgramFiles)) {
+        if (-not $base) { continue }
+        $inc = Join-Path $base 'Windows Kits\10\Include'
+        if (Test-Path $inc) {
+            $ver = Get-ChildItem $inc -Directory -ErrorAction SilentlyContinue |
+                Select-Object -Last 1 -ExpandProperty Name
+            return [pscustomobject]@{ Present = $true; Root = $base; Include = $inc; Version = $ver }
+        }
+    }
+    return [pscustomobject]@{ Present = $false; Root = $null; Include = $null; Version = $null }
+}
+
 # Print a diagnostics block: versions and locations of everything needed to
 # reproduce a build. This is the first thing to look at in a bug report.
 function Write-Diagnostics {
@@ -75,34 +117,39 @@ function Write-Diagnostics {
     }
 
     if (Get-Command cmake -ErrorAction SilentlyContinue) {
-        Write-Host "  cmake version   : $((& cmake --version 2>&1 | Select-Object -First 1))"
+        $cv = Invoke-Native -File 'cmake' -Arguments @('--version')
+        Write-Host "  cmake version   : $(($cv.Output | Select-Object -First 1))"
     }
     if (Get-Command dotnet -ErrorAction SilentlyContinue) {
-        Write-Host "  dotnet version  : $((& dotnet --version 2>&1 | Select-Object -First 1))"
+        $dv = Invoke-Native -File 'dotnet' -Arguments @('--version')
+        Write-Host "  dotnet version  : $(($dv.Output | Select-Object -First 1))"
     }
 
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
     if (Test-Path $vswhere) {
-        $vs = & $vswhere -latest -property displayName 2>$null
-        Write-Host "  Visual Studio   : $vs"
-        $vc = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>$null
-        Write-Host "  VC tools        : $vc"
+        $vs = Invoke-Native -File $vswhere -Arguments @('-latest', '-property', 'displayName')
+        Write-Host "  Visual Studio   : $(($vs.Output | Select-Object -First 1))"
+        $vc = Invoke-Native -File $vswhere -Arguments @('-latest', '-products', '*',
+                '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+                '-property', 'installationPath')
+        Write-Host "  VC tools        : $(($vc.Output | Select-Object -First 1))"
     } else {
         Write-Host "  Visual Studio   : (vswhere not found)"
     }
 
-    if ($env:ProgramFiles) {
-        $p = Join-Path $env:ProgramFiles 'Windows Kits\10\Include'
-        Write-Host "  Windows Kits Include: $(if (Test-Path $p) { 'present' } else { 'missing' })"
-    } else {
-        Write-Host "  Windows Kits Include: (ProgramFiles not set)"
-    }
+    $sdk = Find-WindowsSdk
+    Write-Host "  Windows SDK     : $(if ($sdk.Present) { "$($sdk.Version) under $($sdk.Root)" } else { 'missing' })"
 
-    if (Get-Command git -ErrorAction SilentlyContinue) {
-        $sha = & git -C $Root rev-parse --short HEAD 2>$null
-        $br = & git -C $Root rev-parse --abbrev-ref HEAD 2>$null
-        Write-Host "  git             : $br @ $sha"
-        $dirty = & git -C $Root status --porcelain 2>$null
-        Write-Host "  git dirty       : $(if ($dirty) { 'yes' } else { 'no' })"
+    # git: only probe when the root actually contains a repository, otherwise
+    # git writes to stderr and (with ErrorActionPreference Stop on PS 5.1) would
+    # abort the script. Extracted tarballs have no .git.
+    if ((Test-Path (Join-Path $Root '.git')) -and (Get-Command git -ErrorAction SilentlyContinue)) {
+        $sha = Invoke-Native -File 'git' -Arguments @('-C', $Root, 'rev-parse', '--short', 'HEAD')
+        $br = Invoke-Native -File 'git' -Arguments @('-C', $Root, 'rev-parse', '--abbrev-ref', 'HEAD')
+        Write-Host "  git             : $(($br.Output | Select-Object -First 1)) @ $(($sha.Output | Select-Object -First 1))"
+        $dirty = Invoke-Native -File 'git' -Arguments @('-C', $Root, 'status', '--porcelain')
+        Write-Host "  git dirty       : $(if ($dirty.Output.Count -gt 0) { 'yes' } else { 'no' })"
+    } else {
+        Write-Host "  git             : (not a git checkout)"
     }
 }

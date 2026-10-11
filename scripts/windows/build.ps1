@@ -62,7 +62,10 @@ $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.e
 
 function Get-VsPath {
     if (-not (Test-Path $vswhere)) { return $null }
-    return (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>$null)
+    $r = Invoke-Native -File $vswhere -Arguments @('-latest', '-products', '*',
+            '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+            '-property', 'installationPath')
+    return ($r.Output | Select-Object -First 1)
 }
 
 function Import-VsDevEnvironment {
@@ -117,12 +120,15 @@ try {
         $buildDir = Join-Path $script:Root 'build\windows'
         $cfgArgs = @('-S', $script:Root, '-B', $buildDir, "-DCMAKE_BUILD_TYPE=$Configuration")
         if (Test-Command 'cl') { $cfgArgs += @('-G', 'Visual Studio 17 2022', '-A', 'x64') }
-        & $cmake @cfgArgs 2>&1 | ForEach-Object { Write-Host "    $_" }
-        if ($LASTEXITCODE -ne 0) { throw 'cmake configure failed' }
-        & $cmake --build $buildDir --config $Configuration -j 2>&1 | ForEach-Object { Write-Host "    $_" }
-        if ($LASTEXITCODE -ne 0) { throw 'cmake build failed' }
-        & ctest --test-dir $buildDir -C $Configuration --output-on-failure 2>&1 | ForEach-Object { Write-Host "    $_" }
-        if ($LASTEXITCODE -ne 0) { throw 'tests failed' }
+        $cfg = Invoke-Native -File $cmake -Arguments $cfgArgs
+        $cfg.Output | ForEach-Object { Write-Host "    $_" }
+        if ($cfg.ExitCode -ne 0) { throw "cmake configure failed ($($cfg.ExitCode))" }
+        $bld = Invoke-Native -File $cmake -Arguments @('--build', $buildDir, '--config', $Configuration, '-j')
+        $bld.Output | ForEach-Object { Write-Host "    $_" }
+        if ($bld.ExitCode -ne 0) { throw "cmake build failed ($($bld.ExitCode))" }
+        $ct = Invoke-Native -File 'ctest' -Arguments @('--test-dir', $buildDir, '-C', $Configuration, '--output-on-failure')
+        $ct.Output | ForEach-Object { Write-Host "    $_" }
+        if ($ct.ExitCode -ne 0) { throw "tests failed ($($ct.ExitCode))" }
         Write-Ok 'core + renderer + s1test built and tested'
 
         $exeDir = $buildDir
@@ -138,7 +144,13 @@ try {
     if (-not $SkipDriver) {
         Write-Step 'Stage 2: IddCx driver (MSBuild + WDK)'
         $msbuild = Find-MSBuild
-        $wdk = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\build" -Filter '*WM.txt' -ErrorAction SilentlyContinue
+        $wdkRoot = $null
+        foreach ($base in @(${env:ProgramFiles(x86)}, $env:ProgramFiles)) {
+            if ($base -and (Test-Path (Join-Path $base 'Windows Kits\10\build'))) {
+                $wdkRoot = Join-Path $base 'Windows Kits\10\build'; break
+            }
+        }
+        $wdk = if ($wdkRoot) { Get-ChildItem $wdkRoot -Filter '*WM.txt' -ErrorAction SilentlyContinue }
         if (-not $msbuild) {
             Write-Warn2 'msbuild not found. Skipping the driver (install VS Build Tools; see docs/build.md).'
         } elseif (-not $wdk) {
@@ -146,8 +158,9 @@ try {
         } else {
             Import-VsDevEnvironment | Out-Null
             $proj = Join-Path $script:Root 'driver\AcemagicS1DisplayDriver\AcemagicS1DisplayDriver.vcxproj'
-            & $msbuild $proj /p:Configuration=$Configuration /p:Platform=x64 /m 2>&1 | ForEach-Object { Write-Host "    $_" }
-            if ($LASTEXITCODE -ne 0) { Write-Warn2 'driver build failed (see output above)' }
+            $mb = Invoke-Native -File $msbuild -Arguments @($proj, "/p:Configuration=$Configuration", '/p:Platform=x64', '/m')
+            $mb.Output | ForEach-Object { Write-Host "    $_" }
+            if ($mb.ExitCode -ne 0) { Write-Warn2 'driver build failed (see output above)' }
             else {
                 Write-Ok 'driver built'
                 $drvOut = Join-Path $script:Root "driver\AcemagicS1DisplayDriver\x64\$Configuration"
@@ -172,8 +185,9 @@ try {
         } else {
             $proj = Join-Path $script:Root 'control-app\AcemagicS1Control\AcemagicS1Control.csproj'
             $publish = Join-Path $script:Dist 'control-app'
-            & dotnet publish $proj -c $Configuration -r win-x64 --self-contained false -o $publish 2>&1 | ForEach-Object { Write-Host "    $_" }
-            if ($LASTEXITCODE -ne 0) { Write-Warn2 'control app publish failed' } else { Write-Ok 'control app published' }
+            $pub = Invoke-Native -File 'dotnet' -Arguments @('publish', $proj, '-c', $Configuration, '-r', 'win-x64', '--self-contained', 'false', '-o', $publish)
+            $pub.Output | ForEach-Object { Write-Host "    $_" }
+            if ($pub.ExitCode -ne 0) { Write-Warn2 'control app publish failed' } else { Write-Ok 'control app published' }
         }
     }
 
