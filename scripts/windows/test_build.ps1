@@ -136,9 +136,11 @@ try {
             if (Import-VsDevEnvironment) { Write-Ok 'VS developer environment loaded' }
             else { Write-Warn2 'could not load VS developer environment' }
         }
+        Initialize-RcCompilerEnv | Out-Null
 
         $cfgArgs = @('-S', $script:Root, '-B', $buildDir, '-DCMAKE_BUILD_TYPE=RelWithDebInfo')
         if (Test-Command 'cl') { $cfgArgs += @('-G', 'Visual Studio 17 2022', '-A', 'x64') }
+        if ($env:RC) { $cfgArgs += "-DCMAKE_RC_COMPILER=$($env:RC)" }
 
         $cfg = Invoke-Native -File $cmake -Arguments $cfgArgs
         $cfg.Output | ForEach-Object { Write-Host "    $_" }

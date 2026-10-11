@@ -4,6 +4,17 @@ Each section lists a symptom, the likely cause, and a diagnostic or recovery
 procedure. Diagnostics are available from the control app's **Export
 diagnostics** button and from the renderer log.
 
+## CMake says "Could not find compiler set in environment variable RC"
+
+- **A stale `RC` environment variable.** CMake reads `RC` before searching the
+  PATH. If it holds anything that is not a real `rc.exe` path, configure fails
+  with `Could not find compiler set in environment variable RC`. This can happen
+  when the Visual Studio developer environment is imported into PowerShell.
+- **Fix.** `build-windows.bat` now clears an invalid `RC`/`CC`/`CXX`/`LD` and
+  points `RC` at a real `rc.exe` automatically. If you hit this from a manual
+  `cmake` invocation, delete the variable first:
+  `Remove-Item Env:RC` (PowerShell) or `set RC=` (cmd), then re-run.
+
 ## First: collect a log to send back
 
 Every `build-windows.bat` run writes a full transcript to `logs\log.txt`. To

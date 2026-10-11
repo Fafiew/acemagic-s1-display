@@ -74,6 +74,13 @@ renderer -> HID.
 - **Only probe `git` when `$Root/.git` exists**; tarball checkouts have no repo.
 - Prefer `Invoke-Native -File 'ctest'` over bare `ctest`, so CMake's ctest is
   found even when it is not on PATH.
+- **Clear a polluted `RC` (and `CC`/`CXX`/`LD`) before configuring CMake.**
+  Importing the VS dev shell can leave `RC` set to PowerShell error-record text
+  (`System.Management.Automation.RemoteException`), and CMake reads `RC` before
+  searching the PATH, so configure dies with "Could not find compiler set in
+  environment variable RC". `Initialize-RcCompilerEnv` drops values that are not
+  an existing file or a PATH-resolvable name and points `RC` at a real `rc.exe`
+  (PATH, then the Windows Kits bin). We also pass `-DCMAKE_RC_COMPILER`.
 
 ## Status
 

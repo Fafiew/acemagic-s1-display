@@ -117,9 +117,11 @@ try {
             Write-Host '    importing Visual Studio developer environment...'
             Import-VsDevEnvironment | Out-Null
         }
+        Initialize-RcCompilerEnv | Out-Null
         $buildDir = Join-Path $script:Root 'build\windows'
         $cfgArgs = @('-S', $script:Root, '-B', $buildDir, "-DCMAKE_BUILD_TYPE=$Configuration")
         if (Test-Command 'cl') { $cfgArgs += @('-G', 'Visual Studio 17 2022', '-A', 'x64') }
+        if ($env:RC) { $cfgArgs += "-DCMAKE_RC_COMPILER=$($env:RC)" }
         $cfg = Invoke-Native -File $cmake -Arguments $cfgArgs
         $cfg.Output | ForEach-Object { Write-Host "    $_" }
         if ($cfg.ExitCode -ne 0) { throw "cmake configure failed ($($cfg.ExitCode))" }
@@ -157,6 +159,7 @@ try {
             Write-Warn2 'WDK not found. Skipping the driver (install the WDK; see docs/build.md).'
         } else {
             Import-VsDevEnvironment | Out-Null
+            Initialize-RcCompilerEnv
             $proj = Join-Path $script:Root 'driver\AcemagicS1DisplayDriver\AcemagicS1DisplayDriver.vcxproj'
             $mb = Invoke-Native -File $msbuild -Arguments @($proj, "/p:Configuration=$Configuration", '/p:Platform=x64', '/m')
             $mb.Output | ForEach-Object { Write-Host "    $_" }

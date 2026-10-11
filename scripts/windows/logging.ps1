@@ -80,6 +80,62 @@ function Find-WindowsSdk {
     return [pscustomobject]@{ Present = $false; Root = $null; Include = $null; Version = $null }
 }
 
+# Find a real rc.exe (resource compiler). CMake reads the RC environment
+# variable *before* searching the PATH, so if RC is set to anything invalid the
+# configure step dies with "Could not find compiler set in environment variable
+# RC". A valid RC must be an existing file or a name resolvable on the PATH.
+function Resolve-RcCompiler {
+    if ($env:RC) {
+        if ((Test-Path -LiteralPath $env:RC -ErrorAction SilentlyContinue) -or
+            (Get-Command $env:RC -ErrorAction SilentlyContinue)) {
+            return $env:RC
+        }
+    }
+    $cmd = Get-Command 'rc.exe' -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    $sdk = Find-WindowsSdk
+    if ($sdk.Present) {
+        $binRoot = Join-Path $sdk.Root 'Windows Kits\10\bin'
+        if (Test-Path -LiteralPath $binRoot) {
+            $dirs = Get-ChildItem $binRoot -Directory -ErrorAction SilentlyContinue |
+                Sort-Object Name -Descending
+            foreach ($d in $dirs) {
+                foreach ($arch in @('x64', 'x86')) {
+                    $p = Join-Path $d.FullName "$arch\rc.exe"
+                    if (Test-Path -LiteralPath $p) { return $p }
+                }
+            }
+        }
+    }
+    return $null
+}
+
+# Drop compiler environment variables that do not point at anything real (the
+# VS dev-shell import can leave RC/CC/CXX polluted with PowerShell error text),
+# then point RC at a real rc.exe so CMake configures cleanly.
+function Initialize-RcCompilerEnv {
+    foreach ($name in @('RC', 'CC', 'CXX', 'LD')) {
+        $v = [Environment]::GetEnvironmentVariable($name)
+        if (-not $v) { continue }
+        try {
+            $ok = (Test-Path -LiteralPath $v -ErrorAction SilentlyContinue) -or
+                  [bool](Get-Command $v -ErrorAction SilentlyContinue)
+        } catch { $ok = $false }
+        if (-not $ok) {
+            Remove-Item "env:$name" -ErrorAction SilentlyContinue
+            Write-Host "    [warn] cleared invalid `$$name environment variable"
+        }
+    }
+    $rc = Resolve-RcCompiler
+    if ($rc) {
+        $env:RC = $rc
+        Write-Host "    RC compiler      : $rc"
+    } else {
+        Remove-Item env:RC -ErrorAction SilentlyContinue
+    }
+    return $rc
+}
+
 # Print a diagnostics block: versions and locations of everything needed to
 # reproduce a build. This is the first thing to look at in a bug report.
 function Write-Diagnostics {
@@ -139,6 +195,7 @@ function Write-Diagnostics {
 
     $sdk = Find-WindowsSdk
     Write-Host "  Windows SDK     : $(if ($sdk.Present) { "$($sdk.Version) under $($sdk.Root)" } else { 'missing' })"
+    Write-Host "  RC env          : $(if ($env:RC) { $env:RC } else { '(unset)' })"
 
     # git: only probe when the root actually contains a repository, otherwise
     # git writes to stderr and (with ErrorActionPreference Stop on PS 5.1) would
