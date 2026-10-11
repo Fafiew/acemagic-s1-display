@@ -5,6 +5,7 @@ out/
 dist/
 bin/
 obj/
+logs/
 *.o
 *.obj
 *.dll

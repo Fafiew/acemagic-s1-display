@@ -4,6 +4,23 @@ Each section lists a symptom, the likely cause, and a diagnostic or recovery
 procedure. Diagnostics are available from the control app's **Export
 diagnostics** button and from the renderer log.
 
+## First: collect a log to send back
+
+Every `build-windows.bat` run writes a full transcript to `logs\log.txt`. To
+capture device, driver and autostart state as well, run:
+
+```cmd
+build-windows.bat log
+```
+
+That produces `logs\diagnostics.txt` — a single file containing the build log,
+environment/toolchain versions, the physical LCD's PnP/HID state, the virtual
+display driver state, the autostart entries and the renderer log. Send that one
+file when reporting a bug. To capture just a build/test run, run
+`build-windows.bat test` and send `logs\log.txt`.
+
+Both files are ignored by git and contain no secrets.
+
 ## The virtual monitor does not appear
 
 - **Driver not installed or not bound.** Open Device Manager, enable *View →

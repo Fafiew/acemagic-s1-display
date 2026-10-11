@@ -30,11 +30,18 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$script:Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+
+. (Join-Path $PSScriptRoot 'logging.ps1')
+$logPath = if ($env:S1_LOG_FILE) { $env:S1_LOG_FILE } else { Join-Path $script:Root 'logs\log.txt' }
+Initialize-Log -Path $logPath
 
 function Test-Admin {
-    $id = [Security.Principal.WindowsIdentity]::GetCurrent()
-    return (New-Object Security.Principal.WindowsPrincipal($id)).IsInRole(
-        [Security.Principal.WindowsBuiltInRole]::Administrator)
+    try {
+        $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+        return (New-Object Security.Principal.WindowsPrincipal($id)).IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator)
+    } catch { return $false }
 }
 
 if (-not (Test-Path $DriverDir)) { throw "DriverDir not found: $DriverDir" }
@@ -101,3 +108,4 @@ foreach ($f in $files) {
 Write-Host ''
 Write-Host 'Done. Reboot, then install the driver (installer\install.ps1).' -ForegroundColor Green
 Write-Host 'To roll back:  bcdedit /set testsigning off  and remove the certificate.'
+Stop-Log

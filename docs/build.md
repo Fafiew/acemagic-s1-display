@@ -36,7 +36,14 @@ build-windows.bat
    (portable core + `renderer` + `s1test`, the driver if the WDK is present, the
    control app if the .NET SDK is present) into `dist\windows\`.
 
-Modes: `build-windows.bat deps|test|build|startup`.
+Modes: `build-windows.bat deps|test|build|startup|log`.
+
+**Logging.** Every run writes a full transcript to `logs\log.txt` (PowerShell
+`Start-Transcript`, so it captures all command output). To also capture the
+device/driver/autostart state, run `build-windows.bat log`, which writes
+`logs\diagnostics.txt`. Send either file when reporting a build or runtime bug;
+both are git-ignored and contain no secrets. Override the log location with the
+`S1_LOG_FILE` environment variable, or pass `-LogPath` to the individual scripts.
 
 For the autostart pieces:
 

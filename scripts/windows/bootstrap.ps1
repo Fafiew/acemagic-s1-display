@@ -26,12 +26,18 @@
 #>
 [CmdletBinding()]
 param(
+    [string] $LogPath,
     [switch] $NoDriver,
     [switch] $NoDotNet
 )
 
 $ErrorActionPreference = 'Continue'
 $script:Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+
+. (Join-Path $PSScriptRoot 'logging.ps1')
+if (-not $LogPath) { $LogPath = $env:S1_LOG_FILE }
+if (-not $LogPath) { $LogPath = Join-Path $script:Root 'logs\log.txt' }
+Initialize-Log -Path $LogPath
 
 function Write-Step($m) { Write-Host "`n==> $m" -ForegroundColor Cyan }
 function Write-Ok($m)   { Write-Host "    [ok]   $m" -ForegroundColor Green }
@@ -40,9 +46,11 @@ function Write-Info($m) { Write-Host "    $m" }
 
 function Test-Command($n) { return [bool](Get-Command $n -ErrorAction SilentlyContinue) }
 function Test-Admin {
-    $id = [Security.Principal.WindowsIdentity]::GetCurrent()
-    return (New-Object Security.Principal.WindowsPrincipal($id)).IsInRole(
-        [Security.Principal.WindowsBuiltInRole]::Administrator)
+    try {
+        $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+        return (New-Object Security.Principal.WindowsPrincipal($id)).IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator)
+    } catch { return $false }
 }
 
 $hasWinget = Test-Command 'winget'
@@ -135,3 +143,4 @@ if (-not $NoDotNet) {
 Write-Step 'Bootstrap complete'
 Write-Info 'New installs may require a new shell before they appear on PATH.'
 Write-Info 'Next:  scripts\windows\build.ps1   (or test_build.ps1 to verify)'
+Stop-Log

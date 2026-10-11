@@ -88,7 +88,11 @@ winget, needs no manual setup), `scripts\windows\test_build.ps1` (**verifies the
 method works** — configure, build, CTest, renderer self-test, `s1test` mock run),
 then `scripts\windows\build.ps1` (driver if the WDK is present, control app if
 the .NET SDK is present). Outputs land in `dist\windows\`. Modes:
-`deps`, `test`, `build`, `startup`.
+`deps`, `test`, `build`, `startup`, `log`.
+
+Every run writes a full transcript to **`logs\log.txt`** — send that file to
+diagnose a build problem. For a broader snapshot (device, driver and autostart
+state too) run `build-windows.bat log` to produce `logs\diagnostics.txt`.
 
 Enable autostart (a per-user scheduled task that starts the renderer at logon
 and restarts it on failure, plus the control app's Run key):
